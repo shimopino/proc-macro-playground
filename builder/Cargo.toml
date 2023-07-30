@@ -1,5 +1,5 @@
 [package]
-name = "builder"
+name = "derive_builder"
 version = "0.1.0"
 edition = "2021"
 
@@ -16,6 +16,7 @@ name = "tests"
 path = "tests/progress.rs"
 
 [dependencies]
+syn = { version = "2", features = ['extra-traits'] }
 
 [dev-dependencies]
 # マクロをテスト使用すると異常ケースはそもそもコンパイルできないので単純にテストすることが難しい
