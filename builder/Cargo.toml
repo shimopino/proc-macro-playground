@@ -16,6 +16,7 @@ name = "tests"
 path = "tests/progress.rs"
 
 [dependencies]
+quote = "1"
 syn = { version = "2", features = ['extra-traits'] }
 
 [dev-dependencies]
