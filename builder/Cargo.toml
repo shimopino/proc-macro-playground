@@ -1,0 +1,23 @@
+[package]
+name = "builder"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+# cargo testは tests ディレクトリに配置されたファイルはそれぞれ統合テストとなる
+# 結合テスト間でコードを共有したいときは tests/common/mod.rs のようにモジュールを配置し
+# 各テストに mod common; を配置すれば良い
+# 結合テストを１つに結合テストに統合させ、複数のモジュールに分割させることで
+# 自動的にテストを並列に実行することで性能を改善できる
+[[test]]
+name = "tests"
+path = "tests/progress.rs"
+
+[dependencies]
+
+[dev-dependencies]
+# マクロをテスト使用すると異常ケースはそもそもコンパイルできないので単純にテストすることが難しい
+# そこでマクロの実行に失敗した時のエラーを観察し検証するテストハーネスを追加する
+trybuild = { version = "1", features = ["diff"] }
