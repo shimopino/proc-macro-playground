@@ -28,6 +28,28 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 }
             }
         }
+
+        impl #bident {
+            pub fn executable(&mut self, executable: String) -> &mut Self {
+                self.executable = Some(executable);
+                self
+            }
+
+            pub fn args(&mut self, args: Vec<String>) -> &mut Self {
+                self.args = Some(args);
+                self
+            }
+
+            pub fn env(&mut self, env: Vec<String>) -> &mut Self {
+                self.env = Some(env);
+                self
+            }
+
+            pub fn current_dir(&mut self, current_dir: String) -> &mut Self {
+                self.current_dir = Some(current_dir);
+                self
+            }
+        }
     };
 
     expanded.into()
