@@ -1,4 +1,4 @@
-use proc_macro::{Span, TokenStream};
+use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
@@ -6,17 +6,9 @@ use syn::{parse_macro_input, DeriveInput};
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
 
-    // println!("{:#?}", ast);
-    // TokenStream::new()
-
     let name = &ast.ident;
-    println!("{:#?}", name);
     let bname = format!("{}Builder", name);
-    println!("{:#?}", bname);
     let bident = syn::Ident::new(&bname, name.span());
-    println!("name.span -> {:#?}", name.span());
-    println!("Span::call_site() -> {:#?}", Span::call_site());
-    println!("{:#?}", bident);
 
     let expanded = quote! {
         struct #bident {
