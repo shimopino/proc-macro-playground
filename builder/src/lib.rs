@@ -2,6 +2,29 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, DeriveInput};
 
+fn ty_is_option(ty: &syn::Type) -> Option<&syn::Type> {
+    if let syn::Type::Path(ref p) = ty {
+        if p.path.segments.len() != 1 || p.path.segments[0].ident != "Option" {
+            return None;
+        }
+
+        if let syn::PathArguments::AngleBracketed(ref inner_ty) =
+            p.path.segments.first().unwrap().arguments
+        {
+            if inner_ty.args.len() != 1 {
+                return None;
+            }
+
+            let inner_ty = inner_ty.args.first().unwrap();
+            if let syn::GenericArgument::Type(ref t) = inner_ty {
+                return Some(t);
+            }
+        }
+    }
+
+    return None;
+}
+
 #[proc_macro_derive(Builder)]
 pub fn derive(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as DeriveInput);
@@ -21,34 +44,17 @@ pub fn derive(input: TokenStream) -> TokenStream {
     };
 
     let optionized = fields.iter().map(|f| {
-        // let original_type = f.ty.clone();
-
-        // let mut segments = syn::punctuated::Punctuated::new();
-        // segments.push_value(syn::PathSegment {
-        //     ident: original_type.ident,
-        //     // arguments:
-        // });
-        // let ty = syn::Type::Path(syn::TypePath {
-        //     qself: None,
-        //     path: syn::Path {
-        //         leading_colon: None,
-        //         segments,
-        //     },
-        // });
-
-        // syn::Field {
-        //     attrs: Vec::new(),
-        //     vis: syn::Visibility::Inherited,
-        //     ident: f.ident.clone(),
-        //     colon_token: f.colon_token,
-        //     mutability: f.mutability.clone(),
-        //     ty,
-        // }
-
         let name = &f.ident;
         let ty = &f.ty;
-        quote! {
-            #name: std::option::Option<#ty>
+
+        if ty_is_option(ty).is_some() {
+            quote! {
+                #name: #ty
+            }
+        } else {
+            quote! {
+                #name: std::option::Option<#ty>
+            }
         }
     });
 
@@ -56,19 +62,35 @@ pub fn derive(input: TokenStream) -> TokenStream {
         let name = &f.ident;
         let ty = &f.ty;
 
-        quote! {
-            pub fn #name(&mut self, #name: #ty) -> &mut Self {
-                self.#name = Some(#name);
-                self
+        if let Some(inner_ty) = ty_is_option(ty) {
+            quote! {
+                pub fn #name(&mut self, #name: #inner_ty) -> &mut Self {
+                    self.#name = Some(#name);
+                    self
+                }
+            }
+        } else {
+            quote! {
+                pub fn #name(&mut self, #name: #ty) -> &mut Self {
+                    self.#name = Some(#name);
+                    self
+                }
             }
         }
     });
 
     let build_fields = fields.iter().map(|f| {
         let name = &f.ident;
+        let ty = &f.ty;
 
-        quote! {
-            #name: self.#name.clone().ok_or(concat!(stringify!(#name), " is not sef"))?
+        if ty_is_option(ty).is_some() {
+            quote! {
+                #name: self.#name.clone()
+            }
+        } else {
+            quote! {
+                #name: self.#name.clone().ok_or(concat!(stringify!(#name), " is not sef"))?
+            }
         }
     });
 
@@ -94,46 +116,9 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
         impl #bident {
             #(#methods)*
-            // pub fn executable(&mut self, executable: String) -> &mut Self {
-            //     self.executable = Some(executable);
-            //     self
-            // }
-
-            // pub fn args(&mut self, args: Vec<String>) -> &mut Self {
-            //     self.args = Some(args);
-            //     self
-            // }
-
-            // pub fn env(&mut self, env: Vec<String>) -> &mut Self {
-            //     self.env = Some(env);
-            //     self
-            // }
-
-            // pub fn current_dir(&mut self, current_dir: String) -> &mut Self {
-            //     self.current_dir = Some(current_dir);
-            //     self
-            // }
 
             pub fn build(&mut self) ->Result<#name, Box<dyn std::error::Error>> {
-                // if self.executable.is_none() {
-                //     return Err("executable is not set".into());
-                // }
-                // if self.args.is_none() {
-                //     return Err("args is not set".into());
-                // }
-                // if self.env.is_none() {
-                //     return Err("env is not set".into());
-                // }
-                // if self.current_dir.is_none() {
-                //     return Err("current_dir is not set".into());
-                // }
-
                 Ok(#name {
-                    // executable: self.executable.clone().ok_or("executable is not set")?,
-                    // args: self.args.clone().ok_or("args is not set")?,
-                    // env: self.env.clone().ok_or("env is not set")?,
-                    // current_dir: self.current_dir.clone().ok_or("current_dir is not set")?,
-
                     #(#build_fields,)*
                 })
             }
