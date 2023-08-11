@@ -1,126 +1,124 @@
 use proc_macro::TokenStream;
-use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
+use quote::{format_ident, quote};
+use syn::{parse_macro_input, DeriveInput, Type};
 
-fn ty_is_option(ty: &syn::Type) -> Option<&syn::Type> {
-    if let syn::Type::Path(ref p) = ty {
-        if p.path.segments.len() != 1 || p.path.segments[0].ident != "Option" {
-            return None;
-        }
-
-        if let syn::PathArguments::AngleBracketed(ref inner_ty) =
-            p.path.segments.first().unwrap().arguments
-        {
-            if inner_ty.args.len() != 1 {
-                return None;
-            }
-
-            let inner_ty = inner_ty.args.first().unwrap();
-            if let syn::GenericArgument::Type(ref t) = inner_ty {
-                return Some(t);
+/// Returns unwrapped Type in Option as Option<&Type>
+fn unwrap_option(ty: &Type) -> Option<&Type> {
+    if let syn::Type::Path(syn::TypePath {
+        path: syn::Path { segments, .. },
+        ..
+    }) = ty
+    {
+        if segments.len() == 1 {
+            if let Some(syn::PathSegment {
+                ident,
+                arguments:
+                    syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+                        args, ..
+                    }),
+            }) = segments.first()
+            {
+                if ident == "Option" && args.len() == 1 {
+                    if let Some(syn::GenericArgument::Type(inner_ty)) = args.first() {
+                        return Some(inner_ty);
+                    }
+                }
             }
         }
     }
 
-    return None;
+    None
 }
 
 #[proc_macro_derive(Builder)]
 pub fn derive(input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as DeriveInput);
+    let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
 
-    let name = &ast.ident;
-    let bname = format!("{}Builder", name);
-    let bident = syn::Ident::new(&bname, name.span());
+    let ident = parsed.ident;
+    let builder_ident = format_ident!("{}Builder", ident);
 
-    let fields = if let syn::Data::Struct(syn::DataStruct {
-        fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }),
-        ..
-    }) = ast.data
-    {
-        named
-    } else {
-        unimplemented!()
+    let syn::Data::Struct(syn::DataStruct { fields: syn::Fields::Named(syn::FieldsNamed { ref named, .. }), .. }) = parsed.data else {
+        panic!("This macro can only be applied to struct");
     };
 
-    let optionized = fields.iter().map(|f| {
-        let name = &f.ident;
+    let builder_fields = named.iter().map(|f| {
+        let ident = &f.ident;
         let ty = &f.ty;
 
-        if ty_is_option(ty).is_some() {
+        if unwrap_option(ty).is_some() {
             quote! {
-                #name: #ty
+                #ident: #ty
             }
         } else {
             quote! {
-                #name: std::option::Option<#ty>
+                #ident: Option<#ty>
             }
         }
     });
 
-    let methods = fields.iter().map(|f| {
-        let name = &f.ident;
+    let builder_setters = named.iter().map(|f| {
+        let ident = &f.ident;
         let ty = &f.ty;
 
-        if let Some(inner_ty) = ty_is_option(ty) {
+        if let Some(inner_ty) = unwrap_option(ty) {
             quote! {
-                pub fn #name(&mut self, #name: #inner_ty) -> &mut Self {
-                    self.#name = Some(#name);
+                fn #ident(&mut self, #ident: #inner_ty) -> &mut Self {
+                    self.#ident = Some(#ident);
                     self
                 }
             }
         } else {
             quote! {
-                pub fn #name(&mut self, #name: #ty) -> &mut Self {
-                    self.#name = Some(#name);
+                fn #ident(&mut self, #ident: #ty) -> &mut Self {
+                    self.#ident = Some(#ident);
                     self
                 }
             }
         }
     });
 
-    let build_fields = fields.iter().map(|f| {
-        let name = &f.ident;
-        let ty = &f.ty;
-
-        if ty_is_option(ty).is_some() {
-            quote! {
-                #name: self.#name.clone()
-            }
-        } else {
-            quote! {
-                #name: self.#name.clone().ok_or(concat!(stringify!(#name), " is not sef"))?
-            }
-        }
-    });
-
-    let build_empty = fields.iter().map(|f| {
-        let name = &f.ident;
+    let builder_init = named.iter().map(|f| {
+        let ident = &f.ident;
         quote! {
-            #name: None
+            #ident: None
+        }
+    });
+
+    let build_fields = named.iter().map(|f| {
+        let ident = &f.ident;
+        let ty = &f.ty;
+
+        if unwrap_option(ty).is_some() {
+            quote! {
+                #ident: self.#ident.take()
+            }
+        } else {
+            quote! {
+                #ident: self.#ident.take().ok_or(format!("{} is not set", stringify!(#ident)))?
+            }
         }
     });
 
     let expanded = quote! {
-        struct #bident {
-            #(#optionized,)*
+        pub struct #builder_ident {
+            #(#builder_fields,)*
         }
 
-        impl #name {
-            fn builder() -> #bident {
-                #bident {
-                    #(#build_empty,)*
-                }
+        impl #builder_ident {
+            #(#builder_setters)*
+
+            fn build(&mut self) -> Result<#ident, Box<dyn std::error::Error>> {
+                Ok(#ident {
+                    #(#build_fields,)*
+                })
             }
         }
 
-        impl #bident {
-            #(#methods)*
-
-            pub fn build(&mut self) ->Result<#name, Box<dyn std::error::Error>> {
-                Ok(#name {
-                    #(#build_fields,)*
-                })
+        impl #ident {
+            pub fn builder() -> #builder_ident {
+                #builder_ident {
+                    #(#builder_init,)*
+                }
             }
         }
     };

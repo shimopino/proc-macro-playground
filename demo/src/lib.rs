@@ -1,6 +1,34 @@
 use proc_macro::TokenStream;
 use quote::{format_ident, quote};
-use syn::{parse_macro_input, DeriveInput};
+use syn::{parse_macro_input, DeriveInput, Type};
+
+/// Returns unwrapped Type in Option as Option<&Type>
+fn unwrap_option(ty: &Type) -> Option<&Type> {
+    if let syn::Type::Path(syn::TypePath {
+        path: syn::Path { segments, .. },
+        ..
+    }) = ty
+    {
+        if segments.len() == 1 {
+            if let Some(syn::PathSegment {
+                ident,
+                arguments:
+                    syn::PathArguments::AngleBracketed(syn::AngleBracketedGenericArguments {
+                        args, ..
+                    }),
+            }) = segments.first()
+            {
+                if ident == "Option" && args.len() == 1 {
+                    if let Some(syn::GenericArgument::Type(inner_ty)) = args.first() {
+                        return Some(inner_ty);
+                    }
+                }
+            }
+        }
+    }
+
+    None
+}
 
 #[proc_macro_derive(Builder)]
 pub fn derive(input: TokenStream) -> TokenStream {
@@ -16,18 +44,35 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let builder_fields = named.iter().map(|f| {
         let ident = &f.ident;
         let ty = &f.ty;
-        quote! {
-            #ident: Option<#ty>
+
+        if unwrap_option(ty).is_some() {
+            quote! {
+                #ident: #ty
+            }
+        } else {
+            quote! {
+                #ident: Option<#ty>
+            }
         }
     });
 
     let builder_setters = named.iter().map(|f| {
         let ident = &f.ident;
         let ty = &f.ty;
-        quote! {
-            fn #ident(&mut self, #ident: #ty) -> &mut Self {
-                self.#ident = Some(#ident);
-                self
+
+        if let Some(inner_ty) = unwrap_option(ty) {
+            quote! {
+                fn #ident(&mut self, #ident: #inner_ty) -> &mut Self {
+                    self.#ident = Some(#ident);
+                    self
+                }
+            }
+        } else {
+            quote! {
+                fn #ident(&mut self, #ident: #ty) -> &mut Self {
+                    self.#ident = Some(#ident);
+                    self
+                }
             }
         }
     });
@@ -41,8 +86,16 @@ pub fn derive(input: TokenStream) -> TokenStream {
 
     let build_fields = named.iter().map(|f| {
         let ident = &f.ident;
-        quote! {
-            #ident: self.#ident.take().ok_or(format!("{} is not set", stringify!(#ident)))?
+        let ty = &f.ty;
+
+        if unwrap_option(ty).is_some() {
+            quote! {
+                #ident: self.#ident.take()
+            }
+        } else {
+            quote! {
+                #ident: self.#ident.take().ok_or(format!("{} is not set", stringify!(#ident)))?
+            }
         }
     });
 
