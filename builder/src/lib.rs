@@ -2,8 +2,14 @@ use proc_macro::TokenStream;
 use quote::{format_ident, quote};
 use syn::{parse_macro_input, DeriveInput, Type};
 
-/// Returns unwrapped Type in Option as Option<&Type>
-fn unwrap_option(ty: &Type) -> Option<&Type> {
+enum InnerType {
+    OptionType(Type),
+    VecType(Type),
+    PrimitiveType,
+}
+
+/// Returns InnerType enum with unwrapped Type
+fn unwrap_ty(ty: &Type) -> InnerType {
     if let syn::Type::Path(syn::TypePath {
         path: syn::Path { segments, .. },
         ..
@@ -18,19 +24,23 @@ fn unwrap_option(ty: &Type) -> Option<&Type> {
                     }),
             }) = segments.first()
             {
-                if ident == "Option" && args.len() == 1 {
+                if args.len() == 1 {
                     if let Some(syn::GenericArgument::Type(inner_ty)) = args.first() {
-                        return Some(inner_ty);
+                        if ident == "Option" {
+                            return InnerType::OptionType(inner_ty.clone());
+                        } else if ident == "Vec" {
+                            return InnerType::VecType(inner_ty.clone());
+                        }
                     }
                 }
             }
         }
     }
 
-    None
+    InnerType::PrimitiveType
 }
 
-#[proc_macro_derive(Builder)]
+#[proc_macro_derive(Builder, attributes(builder))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
 
@@ -45,14 +55,15 @@ pub fn derive(input: TokenStream) -> TokenStream {
         let ident = &f.ident;
         let ty = &f.ty;
 
-        if unwrap_option(ty).is_some() {
-            quote! {
-                #ident: #ty
+        match unwrap_ty(ty) {
+            InnerType::OptionType(_) => {
+                quote! {
+                    #ident: #ty
+                }
             }
-        } else {
-            quote! {
+            _ => quote! {
                 #ident: Option<#ty>
-            }
+            },
         }
     });
 
@@ -60,20 +71,19 @@ pub fn derive(input: TokenStream) -> TokenStream {
         let ident = &f.ident;
         let ty = &f.ty;
 
-        if let Some(inner_ty) = unwrap_option(ty) {
-            quote! {
+        match unwrap_ty(ty) {
+            InnerType::OptionType(inner_ty) => quote! {
                 fn #ident(&mut self, #ident: #inner_ty) -> &mut Self {
                     self.#ident = Some(#ident);
                     self
                 }
-            }
-        } else {
-            quote! {
+            },
+            _ => quote! {
                 fn #ident(&mut self, #ident: #ty) -> &mut Self {
                     self.#ident = Some(#ident);
                     self
                 }
-            }
+            },
         }
     });
 
@@ -88,14 +98,13 @@ pub fn derive(input: TokenStream) -> TokenStream {
         let ident = &f.ident;
         let ty = &f.ty;
 
-        if unwrap_option(ty).is_some() {
-            quote! {
+        match unwrap_ty(ty) {
+            InnerType::OptionType(_) => quote! {
                 #ident: self.#ident.take()
-            }
-        } else {
-            quote! {
+            },
+            _ => quote! {
                 #ident: self.#ident.take().ok_or(format!("{} is not set", stringify!(#ident)))?
-            }
+            },
         }
     });
 
