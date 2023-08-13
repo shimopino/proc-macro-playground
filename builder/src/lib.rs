@@ -40,6 +40,26 @@ fn unwrap_ty(ty: &Type) -> InnerType {
     InnerType::PrimitiveType
 }
 
+fn unwrap_builder_attr_value(attr: &syn::Attribute) -> Option<String> {
+    if attr.path().is_ident("builder") {
+        if let Ok(syn::MetaNameValue {
+            value:
+                syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(ref liststr),
+                    ..
+                }),
+            ..
+        }) = attr.parse_args::<syn::MetaNameValue>()
+        {
+            return Some(liststr.value());
+        } else {
+            return None;
+        }
+    }
+
+    None
+}
+
 #[proc_macro_derive(Builder, attributes(builder))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
@@ -68,6 +88,15 @@ pub fn derive(input: TokenStream) -> TokenStream {
     });
 
     let builder_setters = named.iter().map(|f| {
+        if !f.attrs.is_empty() {
+            for attr in &f.attrs {
+                match unwrap_builder_attr_value(attr) {
+                    Some(value) => println!("each = {}", value),
+                    None => println!("unexpected"),
+                }
+            }
+        }
+
         let ident = &f.ident;
         let ty = &f.ty;
 
