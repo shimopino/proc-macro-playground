@@ -52,4 +52,8 @@ fn main() {
 
     assert_eq!(command.executable, "cargo");
     assert_eq!(command.args, vec!["build", "--release"]);
+    assert_eq!(command.current_dir, None);
+
+    let expected: Vec<String> = Vec::new();
+    assert_eq!(command.env, expected);
 }
