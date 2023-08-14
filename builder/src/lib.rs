@@ -40,8 +40,13 @@ fn unwrap_ty(ty: &Type) -> InnerType {
     InnerType::PrimitiveType
 }
 
+enum ParseBuilderAttributeResult {
+    Valid(String),
+    Invalid(syn::Path),
+}
+
 /// unwrap first value from #[builder(each = value)] attribute
-fn unwrap_builder_attr_value(attrs: &[syn::Attribute]) -> Option<String> {
+fn unwrap_builder_attr_value(attrs: &[syn::Attribute]) -> Option<ParseBuilderAttributeResult> {
     attrs.iter().find_map(|attr| {
         if attr.path().is_ident("builder") {
             if let Ok(syn::MetaNameValue {
@@ -50,10 +55,14 @@ fn unwrap_builder_attr_value(attrs: &[syn::Attribute]) -> Option<String> {
                         lit: syn::Lit::Str(ref liststr),
                         ..
                     }),
+                path,
                 ..
             }) = attr.parse_args::<syn::MetaNameValue>()
             {
-                return Some(liststr.value());
+                if !path.is_ident("each") {
+                    return Some(ParseBuilderAttributeResult::Invalid(path));
+                }
+                return Some(ParseBuilderAttributeResult::Valid(liststr.value()));
             } else {
                 return None;
             }
@@ -116,30 +125,36 @@ pub fn derive(input: TokenStream) -> TokenStream {
             InnerType::VecType(inner_ty) => {
                 let default_setter = generate_default_setter_with(ident, ty);
 
-                if let Some(each) = unwrap_builder_attr_value(&f.attrs) {
-                    let each_ident = format_ident!("{}", each);
-                    let vec_setters = quote! {
-                        fn #each_ident(&mut self, #each_ident: #inner_ty) -> &mut Self {
-                            if let Some(ref mut values) = self.#ident {
-                                values.push(#each_ident);
-                            } else {
-                                self.#ident = Some(vec![#each_ident]);
+                match unwrap_builder_attr_value(&f.attrs) {
+                    Some(ParseBuilderAttributeResult::Valid(each)) => {
+                        let each_ident = format_ident!("{}", each);
+                        let vec_setters = quote! {
+                            fn #each_ident(&mut self, #each_ident: #inner_ty) -> &mut Self {
+                                if let Some(ref mut values) = self.#ident {
+                                    values.push(#each_ident);
+                                } else {
+                                    self.#ident = Some(vec![#each_ident]);
+                                }
+                                self
                             }
-                            self
-                        }
-                    };
-
-                    if ident.clone().unwrap() == each_ident {
-                        return vec_setters;
-                    } else {
-                        return quote! {
-                            #vec_setters
-                            #default_setter
                         };
+
+                        if ident.clone().unwrap() == each_ident {
+                            return vec_setters;
+                        } else {
+                            return quote! {
+                                #vec_setters
+                                #default_setter
+                            };
+                        }
                     }
-                } else {
-                    return default_setter;
-                }
+                    Some(ParseBuilderAttributeResult::Invalid(path)) => {
+                        return syn::Error::new_spanned(path, "expected `builder(each = expr)`")
+                            .to_compile_error()
+                            .into()
+                    }
+                    None => return default_setter,
+                };
             }
             InnerType::OptionType(inner_ty) => generate_default_setter_with(ident, &inner_ty),
             InnerType::PrimitiveType => generate_default_setter_with(ident, ty),

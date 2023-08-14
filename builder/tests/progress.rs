@@ -8,4 +8,5 @@ fn tests() {
     t.pass("tests/05-method-chaining.rs");
     t.pass("tests/06-optional-chaining.rs");
     t.pass("tests/07-repeated-field.rs");
+    t.compile_fail("tests/08-unrecognized-attribute.rs");
 }
