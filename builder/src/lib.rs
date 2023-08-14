@@ -71,6 +71,19 @@ fn extract_named_fields(data: &syn::Data) -> &Punctuated<syn::Field, syn::token:
     named
 }
 
+// ty の場合も inner_ty の場合も同じ構造なので、依存を引数に移動させて、生成するストリームを制御する
+fn generate_default_setter_with(
+    ident: &Option<syn::Ident>,
+    ty: &syn::Type,
+) -> proc_macro2::TokenStream {
+    quote! {
+        fn #ident(&mut self, #ident: #ty) -> &mut Self {
+            self.#ident = Some(#ident);
+            self
+        }
+    }
+}
+
 #[proc_macro_derive(Builder, attributes(builder))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
@@ -99,15 +112,10 @@ pub fn derive(input: TokenStream) -> TokenStream {
         let ident = &f.ident;
         let ty = &f.ty;
 
-        let default_setter = quote! {
-            fn #ident(&mut self, #ident: #ty) -> &mut Self {
-                self.#ident = Some(#ident);
-                self
-            }
-        };
-
         match unwrap_ty(ty) {
             InnerType::VecType(inner_ty) => {
+                let default_setter = generate_default_setter_with(ident, ty);
+
                 if let Some(each) = unwrap_builder_attr_value(&f.attrs) {
                     let each_ident = format_ident!("{}", each);
                     let vec_setters = quote! {
@@ -133,13 +141,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
                     return default_setter;
                 }
             }
-            InnerType::OptionType(inner_ty) => quote! {
-                fn #ident(&mut self, #ident: #inner_ty) -> &mut Self {
-                    self.#ident = Some(#ident);
-                    self
-                }
-            },
-            InnerType::PrimitiveType => default_setter,
+            InnerType::OptionType(inner_ty) => generate_default_setter_with(ident, &inner_ty),
+            InnerType::PrimitiveType => generate_default_setter_with(ident, ty),
         }
     });
 
