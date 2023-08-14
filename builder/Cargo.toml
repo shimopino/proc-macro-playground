@@ -16,6 +16,7 @@ name = "tests"
 path = "tests/progress.rs"
 
 [dependencies]
+proc-macro2 = "1"
 quote = "1"
 syn = { version = "2", features = ['extra-traits'] }
 

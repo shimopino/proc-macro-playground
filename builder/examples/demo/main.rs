@@ -10,4 +10,18 @@ pub struct Command {
     current_dir: Option<String>,
 }
 
-fn main() {}
+fn main() {
+    let command = Command::builder()
+        .executable("cargo".to_owned())
+        .arg("build".to_owned())
+        .arg("--release".to_owned())
+        // .env("development".to_string())
+        .build()
+        .unwrap();
+
+    assert_eq!(command.executable, "cargo");
+    assert_eq!(command.args, vec!["build", "--release"]);
+    let expected: Vec<String> = Vec::new();
+    assert_eq!(command.env, expected);
+    assert_eq!(command.current_dir, None);
+}
