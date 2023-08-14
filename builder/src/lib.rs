@@ -112,7 +112,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                 }
             }
             _ => quote! {
-                #ident: Option<#ty>
+                #ident: std::option::Option<#ty>
             },
         }
     });
@@ -133,7 +133,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                                 if let Some(ref mut values) = self.#ident {
                                     values.push(#each_ident);
                                 } else {
-                                    self.#ident = Some(vec![#each_ident]);
+                                    self.#ident = std::option::Option::Some(vec![#each_ident]);
                                 }
                                 self
                             }
@@ -164,7 +164,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let builder_init = named.iter().map(|f| {
         let ident = &f.ident;
         quote! {
-            #ident: None
+            #ident: std::option::Option::None
         }
     });
 
@@ -193,7 +193,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
         impl #builder_ident {
             #(#builder_setters)*
 
-            fn build(&mut self) -> Result<#ident, Box<dyn std::error::Error>> {
+            fn build(&mut self) -> std::result::Result<#ident, std::boxed::Box<dyn std::error::Error>> {
                 Ok(#ident {
                     #(#build_fields,)*
                 })
