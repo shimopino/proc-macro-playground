@@ -95,7 +95,7 @@ fn generate_default_setter_with(
 
 #[proc_macro_derive(Builder, attributes(builder))]
 pub fn derive(input: TokenStream) -> TokenStream {
-    let parsed: DeriveInput = parse_macro_input!(input as DeriveInput);
+    let parsed = parse_macro_input!(input as DeriveInput);
 
     let ident = parsed.ident;
     let builder_ident = format_ident!("{}Builder", ident);
@@ -148,8 +148,8 @@ pub fn derive(input: TokenStream) -> TokenStream {
                             };
                         }
                     }
-                    Some(ParseBuilderAttributeResult::Invalid(path)) => {
-                        return syn::Error::new_spanned(path, "expected `builder(each = \"...\")`")
+                    Some(ParseBuilderAttributeResult::Invalid(meta)) => {
+                        return syn::Error::new_spanned(meta, "expected `builder(each = \"...\")`")
                             .to_compile_error()
                             .into()
                     }
