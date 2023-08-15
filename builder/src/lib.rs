@@ -42,7 +42,7 @@ fn unwrap_ty(ty: &Type) -> InnerType {
 
 enum ParseBuilderAttributeResult {
     Valid(String),
-    Invalid(syn::Path),
+    Invalid(syn::Meta),
 }
 
 /// unwrap first value from #[builder(each = value)] attribute
@@ -60,7 +60,7 @@ fn unwrap_builder_attr_value(attrs: &[syn::Attribute]) -> Option<ParseBuilderAtt
             }) = attr.parse_args::<syn::MetaNameValue>()
             {
                 if !path.is_ident("each") {
-                    return Some(ParseBuilderAttributeResult::Invalid(path));
+                    return Some(ParseBuilderAttributeResult::Invalid(attr.meta.clone()));
                 }
                 return Some(ParseBuilderAttributeResult::Valid(liststr.value()));
             } else {
@@ -149,7 +149,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
                         }
                     }
                     Some(ParseBuilderAttributeResult::Invalid(path)) => {
-                        return syn::Error::new_spanned(path, "expected `builder(each = expr)`")
+                        return syn::Error::new_spanned(path, "expected `builder(each = \"...\")`")
                             .to_compile_error()
                             .into()
                     }
