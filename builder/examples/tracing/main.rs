@@ -21,7 +21,7 @@ impl syn::parse::Parse for Args {
         while !input.is_empty() {
             let lookahead = input.lookahead1();
             if lookahead.peek(kw::name) {
-                let name = input.parse::<StrArg<kw::name>>()?;
+                let name = input.parse::<NameValue>()?;
                 args.name = Some(name.value);
             } else if lookahead.peek(Token![,]) {
                 let _ = input.parse::<Token![,]>()?;
@@ -37,20 +37,16 @@ impl syn::parse::Parse for Args {
     }
 }
 
-struct StrArg<T> {
+struct NameValue {
     value: syn::LitStr,
-    _p: std::marker::PhantomData<T>,
 }
 
-impl<T: syn::parse::Parse> syn::parse::Parse for StrArg<T> {
+impl syn::parse::Parse for NameValue {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let _ = input.parse::<T>()?;
+        let _ = input.parse::<kw::name>()?;
         let _ = input.parse::<Token![=]>()?;
         let value = input.parse()?;
-        Ok(Self {
-            value,
-            _p: std::marker::PhantomData,
-        })
+        Ok(Self { value })
     }
 }
 
