@@ -97,8 +97,8 @@ fn generate_default_setter_with(
 pub fn derive(input: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(input as DeriveInput);
 
-    let ident = parsed.ident;
-    let builder_ident = format_ident!("{}Builder", ident);
+    let original_ident = parsed.ident;
+    let builder_ident = format_ident!("{}Builder", original_ident);
     let named = extract_named_fields(&parsed.data);
 
     let builder_fields = named.iter().map(|f| {
@@ -193,14 +193,14 @@ pub fn derive(input: TokenStream) -> TokenStream {
         impl #builder_ident {
             #(#builder_setters)*
 
-            fn build(&mut self) -> std::result::Result<#ident, std::boxed::Box<dyn std::error::Error>> {
-                Ok(#ident {
+            fn build(&mut self) -> std::result::Result<#original_ident, std::boxed::Box<dyn std::error::Error>> {
+                Ok(#original_ident {
                     #(#build_fields,)*
                 })
             }
         }
 
-        impl #ident {
+        impl #original_ident {
             pub fn builder() -> #builder_ident {
                 #builder_ident {
                     #(#builder_init,)*
