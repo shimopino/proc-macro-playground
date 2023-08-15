@@ -21,15 +21,18 @@ impl syn::parse::Parse for Args {
         while !input.is_empty() {
             let lookahead = input.lookahead1();
             if lookahead.peek(kw::name) {
-                let name = input.parse::<NameValue>()?;
-                args.name = Some(name.value);
-            } else if lookahead.peek(Token![,]) {
-                let _ = input.parse::<Token![,]>()?;
+                let NameValue(name) = input.parse()?;
+                args.name = Some(name);
             } else if lookahead.peek(kw::skip) {
                 let Skips(skips) = input.parse()?;
                 args.skips = skips
             } else if lookahead.peek(kw::fields) {
                 args.fields = Some(input.parse()?);
+            } else if lookahead.peek(Token![,]) {
+                // 属性間の区切り記号 skip(xxx), <- こういったもの
+                let _ = input.parse::<Token![,]>()?;
+            } else {
+                return Err(syn::Error::new(input.span(), "unexpected token"));
             }
         }
 
@@ -37,16 +40,14 @@ impl syn::parse::Parse for Args {
     }
 }
 
-struct NameValue {
-    value: syn::LitStr,
-}
+struct NameValue(syn::LitStr);
 
 impl syn::parse::Parse for NameValue {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let _ = input.parse::<kw::name>()?;
         let _ = input.parse::<Token![=]>()?;
         let value = input.parse()?;
-        Ok(Self { value })
+        Ok(Self(value))
     }
 }
 
@@ -84,20 +85,20 @@ impl syn::parse::Parse for Fields {
 
 #[derive(Debug)]
 struct Field {
-    name: syn::Ident,
+    key: syn::Ident,
     value: Option<syn::Expr>,
 }
 
 impl syn::parse::Parse for Field {
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        let name = input.parse()?;
+        let key = input.parse()?;
         let value = if input.peek(Token![=]) {
             input.parse::<Token![=]>()?;
             Some(input.parse()?)
         } else {
             None
         };
-        Ok(Self { name, value })
+        Ok(Self { key, value })
     }
 }
 
@@ -110,13 +111,12 @@ fn main() {
         )
     };
 
-    println!("{:#?}", tokens);
-
-    if let Ok(args) = syn::parse2::<Args>(tokens) {
-        println!("args - {:#?}", args.name);
-        println!("skips - {:#?}", args.skips);
-        println!("fields - {:#?}", args.fields);
-    } else {
-        eprintln!("unexpected error");
+    match syn::parse2::<Args>(tokens) {
+        Ok(args) => {
+            println!("args - {:#?}", args.name);
+            println!("skips - {:#?}", args.skips);
+            println!("fields - {:#?}", args.fields);
+        }
+        Err(e) => eprintln!("{:?}", e),
     }
 }
