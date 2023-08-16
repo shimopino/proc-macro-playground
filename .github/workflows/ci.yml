@@ -26,9 +26,6 @@ jobs:
         run: |
           files=$(git diff --name-only main ${{ github.sha }})
           echo "Changed files: $files"
-          # Convert newline characters to %0A
-          # files_output=$(echo "$files" | sed ':a;N;$!ba;s/\n/%0A/g')
-          # echo "::set-output name=files::$files_output"
           files="${files//$'\n'/'%0A'}"
           echo "files=${files}" >> $GITHUB_OUTPUT
 
