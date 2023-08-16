@@ -20,12 +20,16 @@ jobs:
       - name: Fetch main branch
         run: git fetch origin main:main
 
+      # ワークフローをトリガーしたコミット SHA と main ブランチとの差分を検出する
       - name: Get list of changed files
         id: get-changed-files
         run: |
           files=$(git diff --name-only main ${{ github.sha }})
           echo "Changed files: $files"
           echo "::set-output name=files::$files"
+
+      - name: Show Github Variables
+        run: echo ${{ steps.get-changed-files.outputs.files }}
 
       - name: Run Rust Test for builder
         if: contains(steps.get-changed-files.outputs.files, 'builder/')
