@@ -1,0 +1,37 @@
+name: Rust Tests
+
+on:
+  push:
+    paths:
+      - "builder/**"
+      - "debug/**"
+  pull_request:
+    paths:
+      - "builder/**"
+      - "debug/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: Get list of changed files
+        id: get-changed-files
+        run: |
+          files=$(git diff --name-only ${{ github.event.before }} ${{ github.sha }})
+          echo "Changed files: $files"
+          echo "::set-output name=files::$files"
+
+      - name: Run Rust Test for builder
+        if: contains(steps.get-changed-files.outputs.files, 'builder/')
+        uses: ./.github/actions/rust-test
+        with:
+          directory: "builder"
+
+      - name: Run Rust Test for debug
+        if: contains(steps.get-changed-files.outputs.files, 'debug/')
+        uses: ./.github/actions/rust-test
+        with:
+          directory: "debug"
