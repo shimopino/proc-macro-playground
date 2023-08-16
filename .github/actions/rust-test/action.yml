@@ -1,0 +1,17 @@
+name: Run Rust Unit Test
+description: Run cargo test in specified directory
+inputs:
+  directory:
+    description: Directory to run tests in
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Install the Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Rust Cache Action
+      uses: Swatinem/rust-cache@v2
+
+    - run: cd ${{ inputs.directory }} && cargo test
+      shell: bash
