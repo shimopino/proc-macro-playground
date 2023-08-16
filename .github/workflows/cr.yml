@@ -20,10 +20,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           # Optional
-          LANGUAGE: English
+          LANGUAGE: Japanese
           # https://platform.openai.com/docs/models
           # MODEL: gpt-3.5-turbo
           MODEL: gpt-4
-          PROMPT:
+          PROMPT: 次のコード差分から①混乱や規則に従っていないコードがあるかどうか、②Rustのベストプラクティスに従うとどのようにコードを改善できるのか、を確認してください
           top_p: 1
           temperature: 1
