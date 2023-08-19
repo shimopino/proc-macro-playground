@@ -32,4 +32,5 @@ fn main() {
     let debug = format!("{:?}", f);
 
     assert!(debug.starts_with(r#"Field { name: "F","#));
+    assert_eq!(debug, r#"Field { name: "F", bitmask: 28 }"#.to_string());
 }
