@@ -1,8 +1,35 @@
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{parse_macro_input, DeriveInput};
+use syn::{parse_macro_input, spanned::Spanned, DeriveInput};
 
-#[proc_macro_derive(CustomDebug)]
+fn extract_debug_attributes(
+    attrs: &[syn::Attribute],
+) -> Result<Vec<String>, proc_macro2::TokenStream> {
+    let mut attrs_values = vec![];
+
+    for attr in attrs {
+        match &attr.meta {
+            syn::Meta::NameValue(ref named) if named.path.is_ident("debug") => {
+                if let syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(litstr),
+                    ..
+                }) = &named.value
+                {
+                    attrs_values.push(litstr.value());
+                }
+            }
+            _ => {
+                return Err(
+                    syn::Error::new(attr.span(), "only debug attributes can be applied")
+                        .to_compile_error(),
+                )
+            }
+        }
+    }
+    Ok(attrs_values)
+}
+
+#[proc_macro_derive(CustomDebug, attributes(debug))]
 pub fn derive(input: TokenStream) -> TokenStream {
     let parsed = parse_macro_input!(input as DeriveInput);
 
@@ -25,8 +52,22 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let field_calls = named.iter().map(|f| {
         let field_ident = &f.ident;
 
-        quote! {
-            .field(stringify!(#field_ident), &self.#field_ident)
+        match extract_debug_attributes(&f.attrs) {
+            Ok(values) => match values.first() {
+                Some(attr) => {
+                    quote! {
+                        .field(
+                            stringify!(#field_ident),
+                            &format_args!(#attr, &self.#field_ident))
+                    }
+                }
+                None => {
+                    quote! {
+                        .field(stringify!(#field_ident), &self.#field_ident)
+                    }
+                }
+            },
+            Err(err) => err.into(),
         }
     });
 

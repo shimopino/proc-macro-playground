@@ -1,10 +1,6 @@
 name: Rust Tests
 
 on:
-  push:
-    paths:
-      - "builder/**"
-      - "debug/**"
   pull_request:
     paths:
       - "builder/**"
