@@ -2,7 +2,7 @@ use proc_macro::TokenStream;
 use quote::quote;
 use syn::{parse_macro_input, spanned::Spanned, DeriveInput};
 
-fn unwrap_debug_attribute(
+fn extract_debug_attributes(
     attrs: &[syn::Attribute],
 ) -> Result<Vec<String>, proc_macro2::TokenStream> {
     let mut attrs_values = vec![];
@@ -52,7 +52,7 @@ pub fn derive(input: TokenStream) -> TokenStream {
     let field_calls = named.iter().map(|f| {
         let field_ident = &f.ident;
 
-        match unwrap_debug_attribute(&f.attrs) {
+        match extract_debug_attributes(&f.attrs) {
             Ok(values) => match values.first() {
                 Some(attr) => {
                     quote! {
