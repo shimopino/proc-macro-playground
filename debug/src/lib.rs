@@ -71,8 +71,26 @@ pub fn derive(input: TokenStream) -> TokenStream {
         }
     });
 
+    let generics_type = parsed.generics.params.iter().find_map(|param| {
+        if let syn::GenericParam::Type(ty) = param {
+            Some(&ty.ident)
+        } else {
+            None
+        }
+    });
+
+    let debug_impl = if let Some(ty) = generics_type {
+        quote! {
+            impl<#ty: std::fmt::Debug> std::fmt::Debug for #original_ident<#ty>
+        }
+    } else {
+        quote! {
+            impl std::fmt::Debug for #original_ident
+        }
+    };
+
     let expanded = quote! {
-        impl std::fmt::Debug for #original_ident {
+        #debug_impl {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 f.debug_struct(stringify!(#original_ident))
                     #(#field_calls)*
